@@ -1,2 +1,2 @@
-e, f = 4, 5
-print(e + f)
+a, b = 4, 5
+print(a + b)
