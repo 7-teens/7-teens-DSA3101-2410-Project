@@ -29,9 +29,9 @@ app = FastAPI()
 # Step 2: Load datasets from CSV files
 # Load customer, order, and product data from "Cleaned_Datasets" folder
 base_dir = os.path.dirname(os.path.abspath(__file__))  # Get the directory of the current file
-customers_df = pd.read_csv(os.path.join(base_dir, "../Cleaned_Datasets/customer_SG_only.csv"), index_col=0)
-orders_df = pd.read_csv(os.path.join(base_dir, "../Cleaned_Datasets/orders_generated.csv"), index_col=0)
-products_df = pd.read_csv(os.path.join(base_dir, "../Cleaned_Datasets/products_cleaned.csv"), index_col=0)
+customers_df = pd.read_csv(os.path.join(base_dir, "../Cleaned_Datasets/customers_sg.csv"), index_col=0)
+orders_df = pd.read_csv(os.path.join(base_dir, "../Cleaned_Datasets/orders.csv"), index_col=0)
+products_df = pd.read_csv(os.path.join(base_dir, "../Cleaned_Datasets/products.csv"), index_col=0)
 
 # Step 3: Ensure customer_id columns are of string type to avoid mismatches
 customers_df['customer_id'] = customers_df['customer_id'].astype(str)
@@ -107,7 +107,7 @@ def get_customer_info(customer_id):
         
         # Step 8e: Update context and return formatted customer information
         context["last_customer"] = customer_id
-        return f"Customer {customer_id} last logged in {last_login_days_ago} days ago on {last_login_date} {checkout_message}"
+        return f"Great news! We found the information for customer ID {customer_id}. Customer {customer_id} last logged in {last_login_days_ago} days ago on {last_login_date} {checkout_message}"
     
     # Step 8f: Return error message if customer not found
     return "Could not find the customer. Please check the ID!"
@@ -139,20 +139,23 @@ def recommend_products(customer_id):
 
 # Step 10: Define a function to get order status based on order ID
 def get_order_status(order_id):
-    # Step 10a: Search for the order in orders DataFrame
-    order = orders_df[orders_df['order_id'] == order_id]
-    
-    if not order.empty:  # If order is found
-        # Step 10b: Extract product ID and order time
-        product_id = order['product_id'].values[0]
-        order_time = order['order_time'].values[0]
+    # Check if the order_id exists in the DataFrame index
+    if order_id in orders_df.index:
+        # Retrieve the order details using .loc since order_id is the index
+        order = orders_df.loc[order_id]
+        product_id = order['product_id']
+        order_time = order['order_time']
         
-        # Step 10c: Update context and return formatted order status
-        context["last_order"] = order_id
-        return f"Order {order_id} was placed on {order_time} and includes product {product_id}."
-    
-    # Step 10d: Return error message if order not found
-    return "Could not find the order. Please check the ID!"
+        # Store the order ID in the context for potential follow-up queries
+        context["last_order"] = order_id  
+        
+        # Return a message with the order time and associated product ID
+        return (f"Good news! Order {order_id} was placed on {order_time}. "
+                f"The order includes product {product_id}. ")
+    else:
+        # If the order ID is not found, prompt the user to check the ID
+        return (f"Oops, it seems there’s no order with ID {order_id}. "
+                "Can you please check the ID and try again? I’m here to help!")
 
 # Step 11: Define a function to get product information (price or rating) based on product name
 def get_product_info(product_name, info_type="price"):
@@ -193,8 +196,9 @@ def detect_intent_and_entities(user_input):
     
     # Step 12c: Check if user is querying order status
     if re.search(r'order.*id', user_input, re.IGNORECASE):
-        order_id = re.search(r'order_[0-9]+', user_input, re.IGNORECASE)
-        return "order_query", {"order_id": order_id.group(0)} if order_id else {"order_id": None}
+        intent = "order_query"
+        order_id = re.search(r'\b\d+\b', user_input)  
+        return intent, {"order_id": int(order_id.group(0))} if order_id else {"order_id": None}
     
     # Step 12d: Check if user is asking for product price or rating
     if re.search(r'price|rating', user_input, re.IGNORECASE):
