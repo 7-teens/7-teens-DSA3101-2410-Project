@@ -7,3 +7,4 @@ statsmodels
 xgboost
 prophet
 plotly
+sqlite3
