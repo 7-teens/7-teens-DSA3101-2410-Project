@@ -126,8 +126,6 @@ def forecast_next_n_months(train_df, regressors, n, current_stock, current_produ
             xaxis_title="Date",
             yaxis_title="Inventory / Demand",
             legend=dict(x=1.02, y=1, bordercolor="Black", borderwidth=1),
-            width=1000,
-            height=900,
             template="plotly_white",
             showlegend=True
         )
@@ -139,7 +137,7 @@ def forecast_next_n_months(train_df, regressors, n, current_stock, current_produ
         fig_cost.add_annotation(
         x=forecast['ds'].iloc[-1], y=optimal_order_final_cost,
         text=f"Optimal Profit: ${optimal_order_profit:,.2f}", showarrow=True, arrowhead=1, font=dict(color="orange")
-)
+        )
 
         # Optimal Order Cumulative Cost
         fig_cost.add_trace(go.Scatter(
@@ -159,9 +157,7 @@ def forecast_next_n_months(train_df, regressors, n, current_stock, current_produ
             yaxis_title="Cumulative Cost and Revenue",
             legend=dict(x=1.02, y=1, bordercolor="Black", borderwidth=1),
             template="plotly_white",
-            showlegend=True,
-            width=1000,
-            height=900
+            showlegend=True
         )
 
         fig_cost.show()
