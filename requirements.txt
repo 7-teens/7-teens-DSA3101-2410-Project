@@ -4,6 +4,5 @@ matplotlib
 seaborn
 scikit-learn
 statsmodels
-xgboost
 prophet
 plotly

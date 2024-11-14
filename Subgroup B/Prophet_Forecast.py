@@ -1,7 +1,7 @@
 from prophet import Prophet
 import plotly.graph_objects as go
 import numpy as np
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 def forecast_next_n_months(train_df, regressors, n, current_stock, current_produce_cost, current_holding_cost, lead_time, product_price):
     df = train_df.groupby('order_time')['daily_sales'].sum().reset_index()
@@ -14,7 +14,6 @@ def forecast_next_n_months(train_df, regressors, n, current_stock, current_produ
         model.add_regressor(event)
 
     model.fit(df)
-
     future_dates = model.make_future_dataframe(periods=n*31, freq='D')
     start_date = df['ds'].max() + timedelta(days=1)
     end_date = start_date + timedelta(days=n*31)
@@ -22,29 +21,23 @@ def forecast_next_n_months(train_df, regressors, n, current_stock, current_produ
     for event, dates in regressors.items():
             future_dates[f'{event}'] = future_dates['ds'].isin(dates).astype(int)
 
-    forecast = model.predict(future_dates)
-    
-    # Calculate safety stock based on Prophet's upper bound forecast
-    forecast['safety_stock'] = (forecast['yhat_upper'] - forecast['yhat']) * lead_time
+    start_date_title = start_date.strftime("%d %B %Y")
+    end_date_title = end_date.strftime("%d %B %Y")
 
-    # Calculate the theoretical optimal inventory level (Prophet safety stock) for each day in August
+    forecast = model.predict(future_dates)
+    forecast['safety_stock'] = (forecast['yhat_upper'] - forecast['yhat']) * lead_time
     forecast['prophet_safety_stock'] = forecast['yhat'] + forecast['safety_stock']
 
-    # Ensure non-negative values for demand predictions and safety stock
     forecast['yhat'] = np.maximum(0, forecast['yhat'])
     forecast['yhat_lower'] = np.maximum(0, forecast['yhat_lower'])
     forecast['prophet_safety_stock'] = np.maximum(0, forecast['prophet_safety_stock'])
 
     def plot_forecast(forecast):
-        # Plot the forecast with actual August data for comparison
         fig = go.Figure()
-
-        # Prophet Forecast
         fig.add_trace(go.Scatter(
             x=forecast['ds'], y=forecast['yhat'], mode='lines', name="Prophet Forecast", line=dict(color='red', dash='dash'), legendgroup="forecast"
         ))
 
-        # Forecast Interval (shaded area), grouped with Prophet Forecast
         fig.add_trace(go.Scatter(
             x=forecast['ds'].tolist() + forecast['ds'][::-1].tolist(),
             y=forecast['yhat_upper'].tolist() + forecast['yhat_lower'][::-1].tolist(),
@@ -52,17 +45,14 @@ def forecast_next_n_months(train_df, regressors, n, current_stock, current_produ
             hoverinfo="skip", showlegend=False, legendgroup="forecast"
         ))
 
-        # Prophet Safety Stock
         fig.add_trace(go.Scatter(
             x=forecast['ds'], y=forecast['prophet_safety_stock'],
-            mode='lines', name="Prophet Safety Stock",
+            mode='lines', name="Prophet Forecast Safety Stock",
             line=dict(color='blue', dash='dash')
         ))
 
-
-        # Layout adjustments
         fig.update_layout(
-            title=f"Prophet August Forecast",
+            title=f"Prophet Forecast for {start_date_title} to {end_date_title}",
             xaxis_title="Date", yaxis_title="Daily Sales",
             template="plotly_white",
         )
@@ -77,7 +67,6 @@ def forecast_next_n_months(train_df, regressors, n, current_stock, current_produ
         optimal_order_costs = []
         optimal_delayed_orders = {}
         optimal_reorder_lock = False
-
 
         for i, row in forecast.iterrows():
             current_optimal_inventory = optimal_inventory_levels[-1]
@@ -95,31 +84,30 @@ def forecast_next_n_months(train_df, regressors, n, current_stock, current_produ
                     optimal_delayed_orders[arrival_day] = optimal_delayed_orders.get(arrival_day, 0) + reorder_amount_optimal
                     optimal_reorder_lock = True
 
-            # Add holding cost and update inventory after demand and delayed stock arrival
             optimal_order_costs.append(reorder_cost_optimal + current_optimal_inventory * current_holding_cost)
             current_optimal_inventory = max(current_optimal_inventory - int(row['yhat']), 0) + optimal_delayed_orders.get(i, 0)
 
-            # Release the reorder lock if stock has arrived
             if i in optimal_delayed_orders:
                 optimal_reorder_lock = False
             optimal_inventory_levels.append(current_optimal_inventory)
 
-    
-
-        # Update forecast with calculated inventory levels and costs for each strategy
         forecast['optimal_inventory_level'] = optimal_inventory_levels[:-1]
         forecast['optimal_order_cost'] = np.cumsum(optimal_order_costs)
 
-        # Plot inventory levels, reorder points, and safety stock levels
+        # Calculate final cumulative profit for each strategy
+        optimal_order_final_cost = forecast['optimal_order_cost'].iloc[-1]
+        actual_final_revenue = (forecast['yhat'] * product_price).sum()
+
+        # Calculate profits
+        optimal_order_profit = actual_final_revenue - optimal_order_final_cost
+
         fig = go.Figure()
 
-        # Optimal Dynamic Inventory Level
         fig.add_trace(go.Scatter(
             x=forecast['ds'], y=forecast['optimal_inventory_level'],
-            mode='lines', name="Optimal Dynamic Inventory Level", line=dict(color='orange', dash='dash')
+            mode='lines', name="Optimal Inventory Level", line=dict(color='orange', dash='dash')
         ))
 
-        # Optimal Reorder Points with labels
         fig.add_trace(go.Scatter(
             x=[point[0] for point in optimal_reorder_points],
             y=[point[1] for point in optimal_reorder_points],
@@ -128,17 +116,13 @@ def forecast_next_n_months(train_df, regressors, n, current_stock, current_produ
             name="Optimal Reorder Points"
         ))
 
-
-        # Safety Stock Level
         fig.add_trace(go.Scatter(
             x=forecast['ds'], y=forecast['prophet_safety_stock'],
             mode='lines', name="Safety Stock Level", line=dict(color='red', dash='dot')
         ))
 
-
-        # Update layout
         fig.update_layout(
-            title="Inventory Levels, Reorder Points, and Safety Stock with Lead Time and Future Demand Consideration",
+            title=f"Optimal Inventory Levels, Reorder Points, and Safety Stock Levels for {start_date_title} to {end_date_title}",
             xaxis_title="Date",
             yaxis_title="Inventory / Demand",
             legend=dict(x=1.02, y=1, bordercolor="Black", borderwidth=1),
@@ -150,26 +134,27 @@ def forecast_next_n_months(train_df, regressors, n, current_stock, current_produ
 
         fig.show()
 
-                
-        # Cost comparison plot
         fig_cost = go.Figure()
+
+        fig_cost.add_annotation(
+        x=forecast['ds'].iloc[-1], y=optimal_order_final_cost,
+        text=f"Optimal Profit: ${optimal_order_profit:,.2f}", showarrow=True, arrowhead=1, font=dict(color="orange")
+)
 
         # Optimal Order Cumulative Cost
         fig_cost.add_trace(go.Scatter(
             x=forecast['ds'], y=forecast['optimal_order_cost'],
-            mode='lines', name="Optimal Order Cumulative Cost", line=dict(color='orange', dash='dash')
+            mode='lines', name="Optimal Strategy Cumulative Cost", line=dict(color='orange', dash='dash')
         ))
-
 
         # Actual Cumulative Revenue
         fig_cost.add_trace(go.Scatter(
-            x=forecast['ds'], y= np.cumsum(forecast['yhat'] * product_price),
+            x=forecast['ds'], y=np.cumsum(forecast['yhat'] * product_price),
             mode='lines', name="Forecasted Cumulative Revenue", line=dict(color='green')
         ))
 
-        # Update layout for cost comparison
         fig_cost.update_layout(
-            title="Cumulative Cost and Revenue Comparison for Inventory Management Strategies",
+            title=f"Forecasted Cumulative Cost and Revenue for {start_date_title} to {end_date_title}",
             xaxis_title="Date",
             yaxis_title="Cumulative Cost and Revenue",
             legend=dict(x=1.02, y=1, bordercolor="Black", borderwidth=1),
