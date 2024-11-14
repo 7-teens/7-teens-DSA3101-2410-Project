@@ -7,3 +7,5 @@ statsmodels
 prophet
 plotly
 sqlite3
+nltk
+wordcloud
