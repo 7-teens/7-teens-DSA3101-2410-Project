@@ -38,7 +38,7 @@ This command builds the Docker image using the `Dockerfile` and starts the conta
 ### Step 3: Access the Application
 Once the container is running, open a web browser and go to:
 ```
-http://localhost:8888
+http://127.0.0.1:1111/tree
 ```
 ### Step 4: Stop the Container
 To stop the container and clean up, use:
