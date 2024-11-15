@@ -10,7 +10,7 @@ scikit-learn
 statsmodels
 prophet
 plotly
-sqlite3
+db-sqlite3
 nltk
 wordcloud
 streamlit
