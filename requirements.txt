@@ -1,4 +1,8 @@
+fastapi
 pandas
+torch
+transformers
+uvicorn
 numpy
 matplotlib
 seaborn
@@ -7,3 +11,8 @@ statsmodels
 prophet
 plotly
 sqlite3
+nltk
+wordcloud
+streamlit
+requests
+
