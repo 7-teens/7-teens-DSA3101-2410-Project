@@ -28,25 +28,21 @@ Clone the repository to your local machine and navigate to the project directory
 git clone https://github.com/7-teens/7-teens-DSA3101-2410-Project/
 cd 7-teens-DSA3101-2410-Project
 ```
-### Step 2: Build the Docker Image
-Build the Docker image by running the following command in the project directory:
+### Step 2: Build and Start the Docker Container
+Run the following command to build and start the container:
 ```
-docker build -t <image-name> .
+docker-compose up --build
 ```
-Replace ```<image-name>``` with a descriptive name for the Docker image (e.g., ```project-image```).
+This command builds the Docker image using the `Dockerfile` and starts the container as defined in `docker-compose.yml`.
 
-### Step 3: Run the Docker Container
-Run the Docker container with this command:
-```
-docker run -p 8888:8888 -v $(pwd):/app <image-name>
-```
-Explanation:
-```-p 8888:8888``` maps port ```8888``` on your local machine to port ```8888``` inside the container.
-```-v $(pwd):/app``` mounts the current directory (```$(pwd)```) to ```/app``` inside the container, allowing you to see any file changes in real-time.
-
-### Step 4: Access the Application
+### Step 3: Access the Application
 Once the container is running, open a web browser and go to:
 ```
 http://localhost:8888
+```
+### Step 4: Stop the Container
+To stop the container and clean up, use:
+```
+docker-compose down
 ```
 
